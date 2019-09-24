@@ -39,6 +39,9 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     SDL_Texture *texture;
     SDL_Rect SrcR;
     double scale;
+    double M_PI = 3.141592658979;
+    double angle = 45.0*M_PI/180;
+
     surface = load_image(filename);
     if (!surface) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create surface from image: %s", SDL_GetError());
@@ -47,8 +50,11 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     }
 
     texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_SetTextureAlphaMod(texture, 100);
+    SDL_SetTextureColorMod(texture, 255,255,255);
+
     SDL_FreeSurface(surface);
-    if (is_zoomed == 1 && surface->h > screen_height) {
+    if (is_zoomed == 1) { // && surface->h > screen_height) {
         scale = (double)surface->h / screen_height;
     } else {
         scale = 1;
@@ -58,7 +64,7 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     SrcR.w = surface->w / scale;
     SrcR.h = surface->h / scale;
     SDL_RenderClear(renderer);
-    SDL_RenderCopy(renderer, texture, NULL, &SrcR);
+    SDL_RenderCopyEx(renderer, texture, NULL, &SrcR, angle, NULL, SDL_FLIP_NONE);
     SDL_DestroyTexture(texture);
     return 1;
 }
@@ -150,6 +156,11 @@ int main(int argc, char *argv[])
         return 3;
     }
 
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
+    SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, 2);
+
+    SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+
     for (int i=0; i < SDL_GetNumVideoDisplays(); i++) {
         if (SDL_GetCurrentDisplayMode(i, &current) != 0)
             SDL_Log("Could not get display mode for video display #%d: %s", i, SDL_GetError());
@@ -165,11 +176,11 @@ int main(int argc, char *argv[])
         return 3;
     }
 
-    if (SDL_CreateWindowAndRenderer(screen_width, screen_height, SDL_WINDOW_RESIZABLE, &window, &renderer)) {
+    if (SDL_CreateWindowAndRenderer(screen_width, screen_height, SDL_WINDOW_RESIZABLE | SDL_RENDERER_ACCELERATED, &window, &renderer)) {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Couldn't create window and renderer: %s", SDL_GetError());
         return 3;
     }
-    
+    SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "1" );
     char* directory = "./";
     char* temp_filename;
     DIR *dp;
@@ -230,4 +241,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
