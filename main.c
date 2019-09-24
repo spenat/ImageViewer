@@ -1,7 +1,6 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <stdio.h>
-#include <time.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <string.h>
@@ -39,8 +38,6 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     SDL_Texture *texture;
     SDL_Rect SrcR;
     double scale;
-    double M_PI = 3.141592658979;
-    double angle = 45.0*M_PI/180;
 
     surface = load_image(filename);
     if (!surface) {
@@ -64,7 +61,7 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     SrcR.w = surface->w / scale;
     SrcR.h = surface->h / scale;
     SDL_RenderClear(renderer);
-    SDL_RenderCopyEx(renderer, texture, NULL, &SrcR, angle, NULL, SDL_FLIP_NONE);
+    SDL_RenderCopyEx(renderer, texture, NULL, &SrcR, 0, NULL, SDL_FLIP_NONE);
     SDL_DestroyTexture(texture);
     return 1;
 }
@@ -137,7 +134,6 @@ void slide_show(char* directory, DIR* dp, SDL_Renderer* renderer, int is_zoomed,
         }
 
         SDL_RenderPresent(renderer);
-
     }
 }
 
@@ -191,7 +187,6 @@ int main(int argc, char *argv[])
     dp = opendir(directory);
     SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderClear(renderer);
-
  
     int running = 1;
 
@@ -216,7 +211,7 @@ int main(int argc, char *argv[])
                 }
                 else if (event.key.keysym.sym == 115 || event.key.keysym.sym == 102) // press s or f
                 {
-                   slide_show(directory, dp, renderer, is_zoomed, screen_height, screen_width); 
+                    slide_show(directory, dp, renderer, is_zoomed, screen_height, screen_width);
                 }
                 else {
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
@@ -227,9 +222,7 @@ int main(int argc, char *argv[])
                 break;
             default:
                 break;
-           
         }
-
         SDL_RenderPresent(renderer);
     }
 
