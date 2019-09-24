@@ -15,34 +15,14 @@ SDL_Surface* load_image(char* filename) {
     return surface;
 }
 
-/*
-void list_files(char* directory) {
-
-    DIR *dp;
-    struct dirent *ep;
-    dp = opendir (directory);
-    if (dp != NULL)
-    {
-        while ((ep = readdir (dp)))
-            puts (ep->d_name);
-        (void) closedir (dp);
-    }
-    else
-        perror ("Couldn't open the directory");
-
-}
-
-*/
 
 char* read_next(char* directory, DIR* dp) {
     struct dirent *ep;
     char* filename;
 
     if ((ep = readdir(dp))) {
-        // puts(ep->d_name);
         filename = malloc(strlen(ep->d_name) + 1);
         strcpy(filename, ep->d_name);
-        //printf("filename: %s\n", filename);
     } 
     else
     {
@@ -52,6 +32,7 @@ char* read_next(char* directory, DIR* dp) {
     }
     return filename;
 }
+
 
 int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen_width, int screen_height) {
     SDL_Surface *surface;
@@ -67,10 +48,8 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
 
     texture = SDL_CreateTextureFromSurface(renderer, surface);
     SDL_FreeSurface(surface);
-    //printf("surface w: %d h: %d\n", surface->w, surface->h);
     if (is_zoomed == 1 && surface->h > screen_height) {
         scale = (double)surface->h / screen_height;
-        //printf("scale %f\n", scale);
     } else {
         scale = 1;
     }
@@ -83,6 +62,7 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     SDL_DestroyTexture(texture);
     return 1;
 }
+
 
 char* search_next_image(char* directory, DIR* dp, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width)
 {
@@ -127,7 +107,6 @@ void slide_show(char* directory, DIR* dp, SDL_Renderer* renderer, int is_zoomed,
                         is_zoomed = 0;
                     else
                         is_zoomed = 1;
-                    //printf("is_zoomed: %d\n", is_zoomed);
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
 
                 }
@@ -144,7 +123,6 @@ void slide_show(char* directory, DIR* dp, SDL_Renderer* renderer, int is_zoomed,
             default:
                 if (counter > wait_length) {
                     temp_filename = search_next_image(directory, dp, renderer, is_zoomed, screen_height, screen_width);
-                    //printf("temp_filename: %s\n", temp_filename);
                     counter = 0;
                 } else {
                     counter++;
@@ -213,7 +191,6 @@ int main(int argc, char *argv[])
         SDL_Delay(50);
         switch (event.type) {
             case SDL_KEYDOWN:
-                // printf("pressed key:\n value: (%d) char:  (%c) \n", event.key.keysym.sym, event.key.keysym.sym);
                 if (event.key.keysym.sym == 113) // press q
                     running = 0;
                 else if (event.key.keysym.sym == 32) { // press space
@@ -224,7 +201,6 @@ int main(int argc, char *argv[])
                         is_zoomed = 0;
                     else
                         is_zoomed = 1;
-                    //printf("is_zoomed: %d\n", is_zoomed);
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
                 }
                 else if (event.key.keysym.sym == 115 || event.key.keysym.sym == 102) // press s or f
@@ -232,9 +208,7 @@ int main(int argc, char *argv[])
                    slide_show(directory, dp, renderer, is_zoomed, screen_height, screen_width); 
                 }
                 else {
-                    // printf("temp_filename: %s\n", temp_filename);
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
-                    // printf("key not binded\n");
                 }
                 break;
             case SDL_QUIT:
