@@ -162,7 +162,7 @@ void slide_show(int index, int n, char* directory, struct dirent** filelist, SDL
                     index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
                     temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
                     strcpy(temp_filename, directory);
-                    strcpy(temp_filename, filelist[index]->d_name);
+                    strcat(temp_filename, filelist[index]->d_name);
                     counter = 0;
                 } else {
                     counter++;
