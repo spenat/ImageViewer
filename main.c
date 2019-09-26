@@ -1,9 +1,11 @@
+#define _DEFAULT_SOURCE
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <stdio.h>
 #include <dirent.h>
 #include <sys/types.h>
 #include <string.h>
+#include <stdlib.h>
 
 
 SDL_Surface* load_image(char* filename) {
@@ -14,7 +16,7 @@ SDL_Surface* load_image(char* filename) {
     return surface;
 }
 
-
+/*
 char* read_next(char* directory, DIR* dp) {
     struct dirent *ep;
     char* filename;
@@ -31,7 +33,7 @@ char* read_next(char* directory, DIR* dp) {
     }
     return filename;
 }
-
+*/
 
 int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen_width, int screen_height) {
     SDL_Surface *surface;
@@ -66,7 +68,7 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     return 1;
 }
 
-
+/*
 char* search_next_image(char* directory, DIR* dp, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width)
 {
     char* filename;
@@ -86,9 +88,41 @@ char* search_next_image(char* directory, DIR* dp, SDL_Renderer* renderer, int is
     }
     return temp_filename;
 }
+*/
 
+int search_next_image(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width) {
+    char* temp_filename;
+    index++;
+    while((index < n)) {
+        temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
+        strcpy(temp_filename, directory);
+        strcat(temp_filename, filelist[index]->d_name);
+        printf("temp_filename: %s\n", temp_filename);
+        if (show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height))
+            return index;
+        else
+            index++;
+    }
+    return 0;
+}
 
-void slide_show(char* directory, DIR* dp, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width)
+int search_prev_image(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width) {
+    char* temp_filename;
+    index--;
+    while((index >= 0)) {
+        temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
+        strcpy(temp_filename, directory);
+        strcat(temp_filename, filelist[index]->d_name);
+        printf("temp_filename: %s\n", temp_filename);
+        if (show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height))
+            return index;
+        else
+            index--;
+    }
+    return n - 1;
+}
+
+void slide_show(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width)
 {
     char* temp_filename;
     int running = 1;
@@ -125,7 +159,10 @@ void slide_show(char* directory, DIR* dp, SDL_Renderer* renderer, int is_zoomed,
                 break;
             default:
                 if (counter > wait_length) {
-                    temp_filename = search_next_image(directory, dp, renderer, is_zoomed, screen_height, screen_width);
+                    index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
+                    temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
+                    strcpy(temp_filename, directory);
+                    strcpy(temp_filename, filelist[index]->d_name);
                     counter = 0;
                 } else {
                     counter++;
@@ -179,28 +216,66 @@ int main(int argc, char *argv[])
     SDL_SetHint( SDL_HINT_RENDER_SCALE_QUALITY, "1" );
     char* directory = "./";
     char* temp_filename;
-    DIR *dp;
+    // DIR *dp;
+    struct dirent **filelist;
+    int n;
+    int index = 0;
+    // char lastchar;
 
     if (argc > 1) {
         directory = argv[1];
+        //lastchar = directory[strlen(directory) - 1];
+        //printf("lastchar: |%c|\n", lastchar);
+        if (directory[strlen(directory) - 1] != '/')
+            strcat(directory, "/");
     }
-    dp = opendir(directory);
+
+    printf("directory: %s\n", directory);
+
+    n = scandir(directory, &filelist, 0, alphasort);
+    if (n < 0)
+        perror("scandir");
+    /*
+    else
+    {
+        for (int index = 0; index < n; ++index)
+        {
+            printf("%s\n", filelist[index]->d_name);
+        }
+    }
+    */
+    // dp = opendir(directory);
     SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0x00);
     SDL_RenderClear(renderer);
  
     int running = 1;
 
-    temp_filename = search_next_image(directory, dp, renderer, is_zoomed, screen_height, screen_width);
+    index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
+    temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
+    strcpy(temp_filename, directory);
+    strcat(temp_filename, filelist[index]->d_name);
 
     while (running) {
         SDL_PollEvent(&event);
         SDL_Delay(50);
         switch (event.type) {
             case SDL_KEYDOWN:
+                printf("key pressed: %d\n", event.key.keysym.sym);
                 if (event.key.keysym.sym == 113) // press q
                     running = 0;
-                else if (event.key.keysym.sym == 32) { // press space
-                    temp_filename = search_next_image(directory, dp, renderer, is_zoomed, screen_height, screen_width);
+                else if (event.key.keysym.sym == 32 || event.key.keysym.sym == 46) { // press space
+                    index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
+                    printf("index: %d\n", index);
+                    temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
+                    strcpy(temp_filename, directory);
+                    strcat(temp_filename, filelist[index]->d_name);
+                }
+                else if (event.key.keysym.sym == 8 || event.key.keysym.sym == 44) { // press space
+                    index = search_prev_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
+                    printf("index: %d\n", index);
+                    temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
+                    strcpy(temp_filename, directory);
+                    strcat(temp_filename, filelist[index]->d_name);
                 }
                 else if (event.key.keysym.sym == 98 || event.key.keysym.sym == 122) { // press b or z
                     if (is_zoomed)
@@ -211,7 +286,7 @@ int main(int argc, char *argv[])
                 }
                 else if (event.key.keysym.sym == 115 || event.key.keysym.sym == 102) // press s or f
                 {
-                    slide_show(directory, dp, renderer, is_zoomed, screen_height, screen_width);
+                    slide_show(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
                 }
                 else {
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
