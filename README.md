@@ -36,7 +36,9 @@ s or f: start slideshow
 
 q: quit
 
-space: next image
+space or .: next image
+
+backspace or ,: previous image
 
 arrows: move image
 
