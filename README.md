@@ -58,4 +58,4 @@ space or .: next batch of thumbnails
 
 backspace or ,: previous batch of thumbnails
 
-q: exit thimbnail mode
+q: exit thumbnail mode
