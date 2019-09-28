@@ -44,7 +44,7 @@ arrows: move image
 
 t: toggle thumbnail mode
 
-##### While in slideshow keys
+##### While in slideshow
 
 b or z: toggle zoom
 
