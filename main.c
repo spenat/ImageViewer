@@ -426,7 +426,7 @@ int main(int argc, char *argv[])
                 }
                 else if (event.key.keysym.sym == 116) { // press t
                     printf("show thumbs\n");
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, index);
+                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, 0);
                     index = thumb_mode(index, n, directory, filelist, renderer, screen_height, screen_width);
                     temp_filename = get_filename(filelist, directory, index, n);
                     x = 0;
