@@ -1,6 +1,7 @@
 #define _DEFAULT_SOURCE
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 #include <stdio.h>
 #include <dirent.h>
 #include <sys/types.h>
@@ -17,12 +18,15 @@ SDL_Surface* load_image(char* filename) {
 }
 
 
-char* get_filename(struct dirent** filelist, char* directory, int index) {
-    char* temp_filename;
-    temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
-    strcpy(temp_filename, directory);
-    strcat(temp_filename, filelist[index]->d_name);
-    return temp_filename;
+char* get_filename(struct dirent** filelist, char* directory, int index, int n) {
+    if (index < n) {
+        char* temp_filename;
+        temp_filename = malloc(strlen(directory) + strlen(filelist[index]->d_name) + 1);
+        strcpy(temp_filename, directory);
+        strcat(temp_filename, filelist[index]->d_name);
+        return temp_filename;
+    }
+    return "";
 }
 
 
@@ -30,7 +34,7 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     SDL_Surface *surface;
     SDL_Texture *texture;
     SDL_Rect SrcR;
-    double scale;
+    double scale = 1;
 
     surface = load_image(filename);
     if (!surface) {
@@ -40,15 +44,16 @@ int show_image(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     }
 
     texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_SetTextureAlphaMod(texture, 100);
-    SDL_SetTextureColorMod(texture, 255,255,255);
 
     SDL_FreeSurface(surface);
-    if (is_zoomed == 1) { // && surface->h > screen_height) {
-        scale = (double)surface->h / screen_height;
-    } else {
-        scale = 1;
+    if (is_zoomed){
+        if ((double)surface->h / screen_height > (double)surface->w / screen_width)
+            scale = (double)surface->h / screen_height;
+        else
+            scale = (double)surface->w / screen_width;
     }
+
+
     SrcR.x = (int)((screen_width - (surface->w / scale)) / 2);
     SrcR.y = (int)((screen_height - (surface->h / scale)) / 2);
     SrcR.w = surface->w / scale;
@@ -65,7 +70,7 @@ int show_thumb(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     SDL_Surface *surface;
     SDL_Texture *texture;
     SDL_Rect SrcR;
-    double scale;
+    double scale = 1;
 
     surface = load_image(filename);
     if (!surface) {
@@ -75,15 +80,14 @@ int show_thumb(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     }
 
     texture = SDL_CreateTextureFromSurface(renderer, surface);
-    SDL_SetTextureAlphaMod(texture, 100);
-    SDL_SetTextureColorMod(texture, 255,255,255);
 
-    SDL_FreeSurface(surface);
-    if (is_zoomed == 1) { // && surface->h > screen_height) {
-        scale = (double)surface->h / screen_height;
-    } else {
-        scale = 1;
+    if (is_zoomed){
+        if ((double)surface->h / screen_height > (double)surface->w / screen_width)
+            scale = (double)surface->h / screen_height;
+        else
+            scale = (double)surface->w / screen_width;
     }
+
     SrcR.x = x + (int)((screen_width - (surface->w / scale)) / 2);
     SrcR.y = y + (int)((screen_height - (surface->h / scale)) / 2);
     SrcR.w = surface->w / scale;
@@ -93,7 +97,47 @@ int show_thumb(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     return 1;
 }
 
-void show_thumbs(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int screen_height, int screen_width) 
+void draw_rect(SDL_Renderer* renderer, int width, int height, int x, int y, int color)
+{
+    int thickness = 4;
+    if (color)
+        SDL_SetRenderDrawColor(renderer, 255, 20, 20, SDL_ALPHA_OPAQUE);
+    else
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+
+    for (int index = 0; index < thickness; index++) {
+        SDL_RenderDrawLine(renderer, x, y + index, x + width, y + index);
+        SDL_RenderDrawLine(renderer, x + index, y, x + index, y + height);
+        SDL_RenderDrawLine(renderer, x + width - index, y, x + width - index, y + height);
+        SDL_RenderDrawLine(renderer, x, y + height - index, x + width, y + height - index);
+    }
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0,SDL_ALPHA_OPAQUE);
+}
+
+void mark_thumb(SDL_Renderer* renderer, int index, int marked_index, int screen_width, int screen_height, char* directory, struct dirent** filelist, int n, int jump_size)
+{
+    int rows = 5;
+    int cols = 6;
+    draw_rect(renderer,
+               screen_width / cols,
+               screen_height / rows,
+               ((marked_index) % cols) * (screen_width / cols),
+               ((marked_index) / (rows + 1)) * (screen_height / rows), 1);
+    draw_rect(renderer,
+               screen_width / cols,
+               screen_height / rows,
+               ((marked_index + jump_size) % cols) * (screen_width / cols),
+               ((marked_index + jump_size) / (rows + 1)) * (screen_height / rows), 0);
+    show_thumb(get_filename(filelist, directory, index + marked_index + jump_size, n),
+        renderer, 1,
+        screen_width / cols,
+        screen_height / rows,
+        ((marked_index + jump_size) % cols) * (screen_width / cols),
+        ((marked_index + jump_size) / (rows + 1)) * (screen_height / rows));
+}
+
+
+void show_thumbs(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int screen_height, int screen_width, int marked_index)
 {
     int rows = 5;
     int cols = 6;
@@ -109,14 +153,21 @@ void show_thumbs(int index, int n, char* directory, struct dirent** filelist, SD
             temp_index = index + pos_y * cols + pos_x;
             if (temp_index >= n)
                 break;
-            filename = get_filename(filelist, directory, temp_index);
+            filename = get_filename(filelist, directory, temp_index, n);
             show_thumb(filename, renderer, 1, thumb_width, thumb_height, thumb_width * pos_x, pos_y * thumb_height);
+            if (temp_index == index + marked_index)
+                draw_rect(renderer, thumb_width, thumb_height, thumb_width * pos_x, pos_y * thumb_height, 1);
         }
 }
+
 
 int thumb_mode(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int screen_height, int screen_width)
 {
     int running = 1;
+    int marked_index = 0;
+    int cols = 6;
+    int rows = 5;
+    int pressed = 0;
     SDL_Event event;
     while (running) {
         SDL_PollEvent(&event);
@@ -126,33 +177,56 @@ int thumb_mode(int index, int n, char* directory, struct dirent** filelist, SDL_
                 printf("key pressed: %d\n", event.key.keysym.sym);
                 if (event.key.keysym.sym == 113) // press q
                     running = 0;
-                else if (event.key.keysym.sym == 32 || event.key.keysym.sym == 46) { // press space or .
+                else if ((event.key.keysym.sym == 32 || event.key.keysym.sym == 46) && pressed == 0) { // press space or .
                     index = index + 29;
                     if (index >= n)
                         index = 0;
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width);
+                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, marked_index);
                 }
-                else if (event.key.keysym.sym == 8 || event.key.keysym.sym == 44) { // press backspace or ,
+                else if ((event.key.keysym.sym == 8 || event.key.keysym.sym == 44) && pressed == 0) { // press backspace or ,
                     index = index - 29;
                     if (index <= 0)
                         index = n - 30;
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width);
-
+                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, marked_index);
                 }
-                else if (event.key.keysym.sym == 116) {
+                else if (event.key.keysym.sym == 116 && pressed == 0) {
                     printf("show thumbs\n");
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width);
+                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, marked_index);
                 }
+                else if (event.key.keysym.sym == 1073741904 && pressed == 0) { // press left
+                    if (marked_index > 0)
+                        marked_index--;
+                    mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, 1);
+                }
+                else if (event.key.keysym.sym == 1073741903 && pressed == 0) { // press right
+                    if (marked_index < cols * rows - 1)
+                        marked_index++;
+                    mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, -1);
+                }
+                else if (event.key.keysym.sym == 1073741906 && pressed == 0) { // press up
+                    if (marked_index > cols - 1)
+                        marked_index = marked_index - cols;
+                    mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, cols);
+                }
+                else if (event.key.keysym.sym == 1073741905 && pressed == 0) { // press down
+                    if (marked_index < (cols * rows - cols))
+                        marked_index = marked_index + cols;
+                    mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, -cols);
+                }
+                pressed = 1;
                 break;
             case SDL_QUIT:
                 running = 0;
+                break;
+            case SDL_KEYUP:
+                pressed = 0;
                 break;
             default:
                 break;
         }
         SDL_RenderPresent(renderer);
     }
-    return index;
+    return index + marked_index;
 }
 
 
@@ -160,7 +234,7 @@ int search_next_image(int index, int n, char* directory, struct dirent** filelis
     char* temp_filename;
     while((index < n - 1)) {
         index++;
-        temp_filename = get_filename(filelist, directory, index);
+        temp_filename = get_filename(filelist, directory, index, n);
         printf("temp_filename: %s\n", temp_filename);
         if (show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height))
             return index;
@@ -168,11 +242,12 @@ int search_next_image(int index, int n, char* directory, struct dirent** filelis
     return 0;
 }
 
+
 int search_prev_image(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width) {
     char* temp_filename;
     while((index > 0)) {
         index--;
-        temp_filename = get_filename(filelist, directory, index);
+        temp_filename = get_filename(filelist, directory, index, n);
         printf("temp_filename: %s\n", temp_filename);
         if (show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height))
             return index;
@@ -180,7 +255,8 @@ int search_prev_image(int index, int n, char* directory, struct dirent** filelis
     return n - 1;
 }
 
-void slide_show(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width)
+
+int slide_show(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int is_zoomed, int screen_height, int screen_width)
 {
     char* temp_filename;
     int running = 1;
@@ -218,7 +294,7 @@ void slide_show(int index, int n, char* directory, struct dirent** filelist, SDL
             default:
                 if (counter > wait_length) {
                     index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
-                    temp_filename = get_filename(filelist, directory, index); 
+                    temp_filename = get_filename(filelist, directory, index, n);
                     counter = 0;
                 } else {
                     counter++;
@@ -228,6 +304,7 @@ void slide_show(int index, int n, char* directory, struct dirent** filelist, SDL
 
         SDL_RenderPresent(renderer);
     }
+    return index;
 }
 
 
@@ -309,9 +386,9 @@ int main(int argc, char *argv[])
     SDL_RenderClear(renderer);
  
     int running = 1;
-
+    int pressed = 0;
     //index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
-    temp_filename = get_filename(filelist, directory, index);
+    temp_filename = get_filename(filelist, directory, index, n);
     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
 
     while (running) {
@@ -322,18 +399,18 @@ int main(int argc, char *argv[])
                 printf("key pressed: %d\n", event.key.keysym.sym);
                 if (event.key.keysym.sym == 113) // press q
                     running = 0;
-                else if (event.key.keysym.sym == 32 || event.key.keysym.sym == 46) { // press space or .
+                else if ((event.key.keysym.sym == 32 || event.key.keysym.sym == 46) && pressed == 0) { // press space or .
                     index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
                     printf("index: %d\n", index);
-                    temp_filename = get_filename(filelist, directory, index);
+                    temp_filename = get_filename(filelist, directory, index, n);
                     x = 0;
                     y = 0;
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
                 }
-                else if (event.key.keysym.sym == 8 || event.key.keysym.sym == 44) { // press backspace or ,
+                else if ((event.key.keysym.sym == 8 || event.key.keysym.sym == 44) && pressed == 0) { // press backspace or ,
                     index = search_prev_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
                     printf("index: %d\n", index);
-                    temp_filename = get_filename(filelist, directory, index);
+                    temp_filename = get_filename(filelist, directory, index, n);
                     x = 0;
                     y = 0;
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
@@ -349,36 +426,36 @@ int main(int argc, char *argv[])
                 }
                 else if (event.key.keysym.sym == 116) { // press t
                     printf("show thumbs\n");
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width);
+                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, index);
                     index = thumb_mode(index, n, directory, filelist, renderer, screen_height, screen_width);
-                    temp_filename = get_filename(filelist, directory, index);
+                    temp_filename = get_filename(filelist, directory, index, n);
                     x = 0;
                     y = 0;
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
                 }
                 else if (event.key.keysym.sym == 115 || event.key.keysym.sym == 102) // press s or f
                 {
-                    slide_show(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
+                    index = slide_show(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
                 }
-                else if (event.key.keysym.sym == 1073741904) { // press left
+                else if (event.key.keysym.sym == 1073741904 && pressed == 0) { // press left
                     x = x - 50;
                     printf("x: %d\n", x);
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
-                else if (event.key.keysym.sym == 1073741903) { // press right
+                else if (event.key.keysym.sym == 1073741903 && pressed == 0) { // press right
                     x = x + 50;
                     printf("x: %d\n", x);
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
-                else if (event.key.keysym.sym == 1073741906) { // press up
+                else if (event.key.keysym.sym == 1073741906 && pressed == 0) { // press up
                     y = y - 50;
                     printf("y: %d\n", y);
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
-                else if (event.key.keysym.sym == 1073741905) { // press down
+                else if (event.key.keysym.sym == 1073741905 && pressed == 0) { // press down
                     y = y + 50;
                     printf("y: %d\n", y);
                     SDL_RenderClear(renderer);
@@ -388,6 +465,10 @@ int main(int argc, char *argv[])
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
+                pressed = 1;
+                break;
+            case SDL_KEYUP:
+                pressed = 0;
                 break;
             case SDL_QUIT:
                 running = 0;
