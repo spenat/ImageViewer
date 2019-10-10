@@ -97,37 +97,47 @@ int show_thumb(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
     return 1;
 }
 
-void draw_rect(SDL_Renderer* renderer, int width, int height, int x, int y, int color)
-{
+
+void draw_rect(SDL_Renderer* renderer, int width, int height, int x, int y, int color) {
     int thickness = 4;
     if (color)
         SDL_SetRenderDrawColor(renderer, 255, 20, 20, SDL_ALPHA_OPAQUE);
     else
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 
-    for (int index = 0; index < thickness; index++) {
+    for (int index = 1; index < thickness; index++) {
         SDL_RenderDrawLine(renderer, x, y + index, x + width, y + index);
         SDL_RenderDrawLine(renderer, x + index, y, x + index, y + height);
         SDL_RenderDrawLine(renderer, x + width - index, y, x + width - index, y + height);
         SDL_RenderDrawLine(renderer, x, y + height - index, x + width, y + height - index);
     }
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0,SDL_ALPHA_OPAQUE);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 }
 
-void mark_thumb(SDL_Renderer* renderer, int index, int marked_index, int screen_width, int screen_height, char* directory, struct dirent** filelist, int n, int jump_size)
-{
+
+void mark_thumb(SDL_Renderer* renderer, int index, int marked_index, int screen_width, int screen_height, char* directory, struct dirent** filelist, int n, int jump_size) {
     int rows = 5;
     int cols = 6;
-    draw_rect(renderer,
-               screen_width / cols,
-               screen_height / rows,
-               ((marked_index) % cols) * (screen_width / cols),
-               ((marked_index) / (rows + 1)) * (screen_height / rows), 1);
-    draw_rect(renderer,
-               screen_width / cols,
-               screen_height / rows,
-               ((marked_index + jump_size) % cols) * (screen_width / cols),
-               ((marked_index + jump_size) / (rows + 1)) * (screen_height / rows), 0);
+    SDL_Rect black_field;
+    SDL_Rect marker;
+
+    marker.x = ((marked_index) % cols) * (screen_width / cols);
+    marker.y = ((marked_index) / (rows + 1)) * (screen_height / rows);
+    marker.w = screen_width / cols;
+    marker.h = screen_height / rows;
+
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
+    SDL_SetRenderDrawColor(renderer, 128, 128, 255, 100);
+    SDL_RenderFillRect(renderer, &marker);
+    SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
+    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+
+    black_field.x = ((marked_index + jump_size) % cols) * (screen_width / cols) - 2;
+    black_field.y = ((marked_index + jump_size) / (rows + 1)) * (screen_height / rows) - 2;
+    black_field.w = screen_width / cols + 4;
+    black_field.h = screen_height / rows + 4;
+
+    SDL_RenderFillRect(renderer, &black_field);
     show_thumb(get_filename(filelist, directory, index + marked_index + jump_size, n),
         renderer, 1,
         screen_width / cols,
