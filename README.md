@@ -22,7 +22,13 @@ install in arch:
 ```
 # pacman -S sdl2_image
 ```
+#### SDL2_TTF
 
+install in arch:
+
+```
+# pacman -S sdl2_ttf
+```
 ### Usage
 
 ```
@@ -44,6 +50,8 @@ arrows: move image
 
 t: toggle thumbnail mode
 
+i: toggle filename infotext
+
 ##### While in slideshow
 
 b or z: toggle zoom
@@ -52,10 +60,14 @@ q: quit slideshow
 
 +/-: increase/decrease wait time length
 
+i: toggle filename infotext
+
 ##### While in thumnail mode
 
 space or .: next batch of thumbnails
 
 backspace or ,: previous batch of thumbnails
+
+i: toggle filename infotext
 
 q: exit thumbnail mode
