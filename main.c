@@ -12,7 +12,6 @@
 
 
 SDL_Surface* load_image(char* filename) {
-
     SDL_Surface *surface;
     surface = IMG_Load(filename);
 
@@ -116,7 +115,7 @@ int show_thumb(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
 
     texture = SDL_CreateTextureFromSurface(renderer, surface);
 
-    if (is_zoomed){
+    if (is_zoomed) {
         if ((double)surface->h / screen_height > (double)surface->w / screen_width)
             scale = (double)surface->h / screen_height;
         else
@@ -133,27 +132,9 @@ int show_thumb(char* filename, SDL_Renderer* renderer, int is_zoomed, int screen
 }
 
 
-void draw_rect(SDL_Renderer* renderer, int width, int height, int x, int y, int color) {
-    int thickness = 4;
-    if (color)
-        SDL_SetRenderDrawColor(renderer, 255, 20, 20, SDL_ALPHA_OPAQUE);
-    else
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-
-    for (int index = 1; index < thickness; index++) {
-        SDL_RenderDrawLine(renderer, x, y + index, x + width, y + index);
-        SDL_RenderDrawLine(renderer, x + index, y, x + index, y + height);
-        SDL_RenderDrawLine(renderer, x + width - index, y, x + width - index, y + height);
-        SDL_RenderDrawLine(renderer, x, y + height - index, x + width, y + height - index);
-    }
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-}
-
-
-void mark_thumb(SDL_Renderer* renderer, int index, int marked_index, int screen_width, int screen_height, char* directory, struct dirent** filelist, int n, int jump_size) {
+void mark_thumb(SDL_Renderer* renderer, int marked_index, int screen_width, int screen_height, char* directory, struct dirent** filelist, int n) {
     int rows = 5;
     int cols = 6;
-    SDL_Rect black_field;
     SDL_Rect marker;
 
     marker.x = ((marked_index) % cols) * (screen_width / cols);
@@ -166,53 +147,63 @@ void mark_thumb(SDL_Renderer* renderer, int index, int marked_index, int screen_
     SDL_RenderFillRect(renderer, &marker);
     SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
     SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-
-    black_field.x = ((marked_index + jump_size) % cols) * (screen_width / cols) - 2;
-    black_field.y = ((marked_index + jump_size) / (rows + 1)) * (screen_height / rows) - 2;
-    black_field.w = screen_width / cols + 4;
-    black_field.h = screen_height / rows + 4;
-
-    SDL_RenderFillRect(renderer, &black_field);
-    show_thumb(get_filename(filelist, directory, index + marked_index + jump_size, n),
-        renderer, 1,
-        screen_width / cols,
-        screen_height / rows,
-        ((marked_index + jump_size) % cols) * (screen_width / cols),
-        ((marked_index + jump_size) / (rows + 1)) * (screen_height / rows));
 }
 
 
-void show_thumbs(int index, int n, char* directory, struct dirent** filelist, SDL_Renderer* renderer, int screen_height, int screen_width, int marked_index) {
+SDL_Surface* get_thumbs_surface(int index, int n, char* directory, struct dirent** filelist, int screen_height, int screen_width) {
     int rows = 5;
     int cols = 6;
     int thumb_width = screen_width / cols;
     int thumb_height = screen_height / rows;
     char* filename;
     int temp_index;
-    SDL_Rect marker;
+    double scale = 1;
+    SDL_Surface* allthumbs;
+    SDL_Rect destination;
+    SDL_PixelFormat format;
 
-    // printf("th : %d\ntw : %d\n", thumb_width, thumb_height);
-    SDL_RenderClear(renderer);
+    SDL_Surface* thumbsurface;
+
+    format.BitsPerPixel = 32;
+    format.BytesPerPixel = 3;
+    format.palette = 0;
+    format.Rmask = 0x0000ff;
+    format.Gmask = 0x00ff00;
+    format.Bmask = 0xff0000;
+    format.Amask = 0;
+
+    allthumbs = SDL_CreateRGBSurface(0, screen_width, screen_height, 32, 0x0000ff, 0x00ff00, 0xff0000, 0);
+
     for (int pos_y = 0; pos_y < rows; pos_y++)
         for (int pos_x = 0; pos_x < cols; pos_x++) {
             temp_index = index + pos_y * cols + pos_x;
             if (temp_index >= n)
                 break;
             filename = get_filename(filelist, directory, temp_index, n);
-            show_thumb(filename, renderer, 1, thumb_width, thumb_height, thumb_width * pos_x, pos_y * thumb_height);
-            if (temp_index == index + marked_index) {
-                // draw_rect(renderer, thumb_width, thumb_height, thumb_width * pos_x, pos_y * thumb_height, 1);
-                marker.x = thumb_width * pos_x;
-                marker.y = thumb_height * pos_y;
-                marker.w = thumb_width;
-                marker.h = thumb_height;
-                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_ADD);
-                SDL_SetRenderDrawColor(renderer, 128, 128, 255, 100);
-                SDL_RenderFillRect(renderer, &marker);
-                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-                SDL_SetRenderDrawColor(renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+            thumbsurface = load_image(filename);
+            if (!thumbsurface) {
+                printf("failed filename: %s\n", filename);
+                continue;
             }
+            if ((double)thumbsurface->h / thumb_height > (double)thumbsurface->w / thumb_width)
+                scale = (double)thumbsurface->h / (double)thumb_height;
+            else
+                scale = (double)thumbsurface->w / (double)thumb_width;
+
+            if (thumbsurface->format->BitsPerPixel < 24) {
+                printf("convert format of ");
+                printf("filename: %s\n", filename);
+                thumbsurface = SDL_ConvertSurface(thumbsurface, &format, 0);
+            }
+            destination.x = thumb_width * pos_x + (int)((thumb_width - (thumbsurface->w / scale)) / 2);
+            destination.y = thumb_height * pos_y + (int)((thumb_height - (thumbsurface->h / scale)) / 2);
+            destination.w = thumbsurface->w / scale;
+            destination.h = thumbsurface->h / scale;
+
+            SDL_BlitScaled(thumbsurface, NULL, allthumbs, &destination);
+            SDL_FreeSurface(thumbsurface);
         }
+    return allthumbs;
 }
 
 
@@ -224,8 +215,21 @@ int thumb_mode(int index, int n, char* directory, struct dirent** filelist, SDL_
     int pressed = 0;
     int show_info = 0;
     SDL_Event event;
+    SDL_Surface* allthumbs;
+    SDL_Texture* allthumbstexture;
+    SDL_Rect everything;
     TTF_Font* font;
     font = load_font(FONT_PATH);
+
+    everything.x = 0;
+    everything.y = 0;
+    everything.w = screen_width;
+    everything.h = screen_height;
+
+    allthumbs = get_thumbs_surface(index, n, directory, filelist, screen_height, screen_width);
+    allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+    SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+    mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
 
     while (running) {
         SDL_PollEvent(&event);
@@ -239,46 +243,88 @@ int thumb_mode(int index, int n, char* directory, struct dirent** filelist, SDL_
                     index = index + 29;
                     if (index >= n)
                         index = 0;
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, marked_index);
+                    SDL_FreeSurface(allthumbs);
+                    if (allthumbstexture)
+                        SDL_DestroyTexture(allthumbstexture);
+                    allthumbs = get_thumbs_surface(index, n, directory, filelist, screen_height, screen_width);
+                    allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                    SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                    mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
                 }
                 else if ((event.key.keysym.sym == 8 || event.key.keysym.sym == 44) && pressed == 0) { // press backspace or ,
                     index = index - 29;
                     if (index <= 0)
                         index = n - 30;
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, marked_index);
+                    SDL_FreeSurface(allthumbs);
+                    if (allthumbstexture)
+                        SDL_DestroyTexture(allthumbstexture);
+                    allthumbs = get_thumbs_surface(index, n, directory, filelist, screen_height, screen_width);
+                    allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                    SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                    mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
+
                 }
-                else if (event.key.keysym.sym == 116 && pressed == 0) {
-                    // printf("show thumbs\n");
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, marked_index);
+                else if (event.key.keysym.sym == 116 && pressed == 0) { // press t
+                    if (allthumbs) {
+                        if (!allthumbstexture)
+                            allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                        SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                    }
+                    mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
                 }
                 else if (event.key.keysym.sym == 1073741904 && pressed == 0) { // press left
                     if (marked_index > 0) {
                         marked_index--;
-                        mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, 1);
+                        if (allthumbs) {
+                            if (!allthumbstexture)
+                                allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                            SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                        }
+                        mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
                     }
                 }
                 else if (event.key.keysym.sym == 1073741903 && pressed == 0) { // press right
                     if (marked_index < cols * rows - 1) {
                         marked_index++;
-                        mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, -1);
+                        if (allthumbs) {
+                            if (!allthumbstexture)
+                                allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                            SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                        }
+                        mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
                     }
                 }
                 else if (event.key.keysym.sym == 1073741906 && pressed == 0) { // press up
                     if (marked_index > cols - 1) {
                         marked_index = marked_index - cols;
-                        mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, cols);
+                        if (allthumbs) {
+                            if(!allthumbstexture)
+                                allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                            SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                        }
+                        mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
                     }
                 }
                 else if (event.key.keysym.sym == 1073741905 && pressed == 0) { // press down
                     if (marked_index < (cols * rows - cols)) {
                         marked_index = marked_index + cols;
-                        mark_thumb(renderer, index, marked_index, screen_width, screen_height, directory, filelist, n, -cols);
+                        if (allthumbs) {
+                            if (!allthumbstexture)
+                                allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                            SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                        }
+                        mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
                     }
                 }
                 else if (event.key.keysym.sym == 105 && pressed == 0 && font) {
                     if (show_info) {
                         show_info = 0;
-                        show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, marked_index);
+                        if (allthumbs) {
+                            if (!allthumbstexture)
+                                allthumbstexture = SDL_CreateTextureFromSurface(renderer, allthumbs);
+                            SDL_RenderCopyEx(renderer, allthumbstexture, NULL, &everything, 0, NULL, SDL_FLIP_NONE);
+                        }
+                        mark_thumb(renderer, marked_index, screen_width, screen_height, directory, filelist, n);
                     } else
                         show_info = 1;
                 }
@@ -480,12 +526,10 @@ int main(int argc, char *argv[]) {
         SDL_Delay(50);
         switch (event.type) {
             case SDL_KEYDOWN:
-                // printf("key pressed: %d\n", event.key.keysym.sym);
                 if (event.key.keysym.sym == 113) // press q
                     running = 0;
                 else if ((event.key.keysym.sym == 32 || event.key.keysym.sym == 46) && pressed == 0) { // press space or .
                     index = search_next_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
-                    // printf("index: %d\n", index);
                     temp_filename = get_filename(filelist, directory, index, n);
                     x = 0;
                     y = 0;
@@ -493,7 +537,6 @@ int main(int argc, char *argv[]) {
                 }
                 else if ((event.key.keysym.sym == 8 || event.key.keysym.sym == 44) && pressed == 0) { // press backspace or ,
                     index = search_prev_image(index, n, directory, filelist, renderer, is_zoomed, screen_height, screen_width);
-                    // printf("index: %d\n", index);
                     temp_filename = get_filename(filelist, directory, index, n);
                     x = 0;
                     y = 0;
@@ -509,8 +552,6 @@ int main(int argc, char *argv[]) {
                     show_image(temp_filename, renderer, is_zoomed, screen_width, screen_height);
                 }
                 else if (event.key.keysym.sym == 116) { // press t
-                    // printf("show thumbs\n");
-                    show_thumbs(index, n, directory, filelist, renderer, screen_height, screen_width, 0);
                     index = thumb_mode(index, n, directory, filelist, renderer, screen_height, screen_width);
                     temp_filename = get_filename(filelist, directory, index, n);
                     x = 0;
@@ -524,25 +565,21 @@ int main(int argc, char *argv[]) {
                 }
                 else if (event.key.keysym.sym == 1073741904 && pressed == 0) { // press left
                     x = x - 50;
-                    // printf("x: %d\n", x);
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
                 else if (event.key.keysym.sym == 1073741903 && pressed == 0) { // press right
                     x = x + 50;
-                    // printf("x: %d\n", x);
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
                 else if (event.key.keysym.sym == 1073741906 && pressed == 0) { // press up
                     y = y - 50;
-                    // printf("y: %d\n", y);
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
                 else if (event.key.keysym.sym == 1073741905 && pressed == 0) { // press down
                     y = y + 50;
-                    // printf("y: %d\n", y);
                     SDL_RenderClear(renderer);
                     show_thumb(temp_filename, renderer, is_zoomed, screen_width, screen_height, x, y);
                 }
